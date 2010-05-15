@@ -1,0 +1,8 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=3092
+
+The purpose of this script is to allow the user to auto-complete a word without having to first press a key combination to open up the list of options, and then have to press more keys (usually the arrow keys) until you get to the word you want to type. With this script, you type a letter or two, and then the number that represents the word that you want to type. The idea is to have the user press as few keys as possible for an auto-completion.
+
+This script is made for people who cannot type as much as they used to anymore. It will probably slow you down somewhat initially, but if you're looking for this script, you're probably not worried about speed.
+Until someone figures out how to connect speech recognition to VIM in a useful way, this may help.  :-)
+
+Documentation and usage instructions are in the file autocomp.vim.
