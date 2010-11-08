@@ -46,11 +46,18 @@ if exists('loaded_autocomp')
 endif
 let loaded_autocomp = 1
 
-let s:letters = '_'
-let s:letters .= 'abcdefghijlmnopqrstuvxzywk'
-let s:letters .= 'ABCDEFGHIJLMNOPQRSTUVXZYWK'
+" This variable is used inside pattern brackets.
+" If you want to match a close square bracket ( ] ), it must be the first character.
+" Backslashes must be doubled.
+let s:letters = '_a-zA-Z'
 
+" Only two values are valid for this variable: 0 and 1.
+" Switch between them and see which mode you like best.
 let s:programmerMode = 1
+
+" Search this many lines, above and below the current line, for possible
+" auto-completions.
+let s:scanRange = 200
 
 highlight AutoCompCommonPrefix term=inverse cterm=inverse gui=inverse
 
@@ -89,39 +96,38 @@ endfunction
 "}}}
 "{{{ Word list
 
-function s:CountWordsInLine(words, filter, line)
-	for l:word in split(a:line, '[^' . s:letters . ']\+')
+" Find words beginning with 'filter' on 'lnum'.
+function s:CountWordsInLine(words, filter, lnum)
+	for l:word in split(getline(a:lnum), '\V\[^' . s:letters . ']\+')
 		" Pay attention to the pair of consecutive dots in the following line. It
 		" means that the filter must be followed by at least two characters to
 		" match.
-		if match(l:word, '^' . a:filter . '..') >= 0
+		if match(l:word, '\V\^' . a:filter . '\.\.') >= 0
 			let a:words[l:word] = get(a:words, l:word, 0) + 1
 		endif
 	endfor
 endfunction
 
-" Count how many times a word is used.
+" Find words beginning with 'filter' in the current buffer.
+" Up to ('scanRange' * 2 + 1) lines are scanned for words.
 function s:CountWordsInBuffer(words, filter)
-	let [l:curRow, l:totRows] = [line('.'), line('$')]
-	for ln in getline(l:curRow < 41 ? 1 : l:curRow - 40, l:curRow + 40)
-		call s:CountWordsInLine(a:words, a:filter, l:ln)
+	let l:curLine = line('.')
+	call s:CountWordsInLine(a:words, a:filter, l:curLine)
+	for index in range(1, s:scanRange)
+		call s:CountWordsInLine(a:words, a:filter, l:curLine - l:index)
+		call s:CountWordsInLine(a:words, a:filter, l:curLine + l:index)
+		if len(a:words) > 20
+			" Enough words found.
+			return
+		endif
 	endfor
-	if len(a:words) < 20
-		for ln in getline(l:curRow < 101 ? 1 : l:curRow - 100, l:curRow - 41)
-			call s:CountWordsInLine(a:words, a:filter, l:ln)
-		endfor
-		for ln in getline(l:curRow + 41, l:curRow + 100)
-			call s:CountWordsInLine(a:words, a:filter, l:ln)
-		endfor
-	endif
 endfunction
 
 function s:WordSortAlg(a, b)
 	return a:b[1] - a:a[1]
 endfunction
 
-" Find the 20 most commonly used words.
-" Result in b:words.
+" Store 20 words for auto-completion in b:autocomp.words.
 function s:UpdateWords(filter)
 	let l:words = {}
 	call s:CountWordsInBuffer(l:words, a:filter)
@@ -160,7 +166,7 @@ function s:FindCommonPrefixes()
 		let l:prefixList = []
 		let l:curWordSize = len(b:autocomp.curWord)
 
-		for prefix in [ 'no', 'auto', 'end' ]
+		for prefix in [ 'no', 'auto', 'end', 'get', 'set' ]
 			if strpart(l:prefix, 0, l:curWordSize) == b:autocomp.curWord
 				let l:prefixList += [strpart(l:prefix, len(b:autocomp.curWord))]
 			endif
@@ -250,7 +256,11 @@ function s:WriteAutoCompleteBuffer()
 			for prefix in sort(keys(l:wordsByPrefix))
 				let l:lines += ['-[' . l:prefix . ']' . repeat('-', winwidth(0) - 3 - len(l:prefix))]
 				for word in sort(l:wordsByPrefix[l:prefix])
-					let l:lines += [len(l:newWordsList) . ' ' . l:word]
+					if l:prefix == l:autocomp.curWord
+						let l:lines += [len(l:newWordsList) . ' ' . l:prefix . l:word]
+					else
+						let l:lines += [len(l:newWordsList) . ' ' . l:word]
+					endif
 					let l:newWordsList += [l:prefix . l:word]
 				endfor
 			endfor
@@ -305,7 +315,7 @@ function s:LetterKeyPressed(key)
 	" Get the current word. (The word under the cursor)
 	let [l:curRow, l:curCol] = getpos('.')[1:2]
 	let l:curLine = getline(l:curRow)
-	let b:autocomp.curWord = matchstr(strpart(l:curLine, 0, l:curCol - 1), '[' . s:letters . ']*$')
+	let b:autocomp.curWord = matchstr(strpart(l:curLine, 0, l:curCol - 1), '\V\[' . s:letters . ']\*\$')
 
 	" Search for words that start with the current word.
 	" If there is no current word, then do nothing.
